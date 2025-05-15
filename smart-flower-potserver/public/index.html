@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Flower Pot Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    .chart-container {
+      width: 80%;
+      margin: 20px auto;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Smart Flower Pot Dashboard</h1>
+
+  <!-- Temperature Chart -->
+  <div class="chart-container">
+    <h2>Temperature (°C)</h2>
+    <canvas id="tempChart"></canvas>
+    <div id="temp-error" class="error"></div>
+  </div>
+
+  <!-- Humidity Chart -->
+  <div class="chart-container">
+    <h2>Humidity (%)</h2>
+    <canvas id="humidityChart"></canvas>
+    <div id="humidity-error" class="error"></div>
+  </div>
+
+  <!-- Light Level Chart -->
+  <div class="chart-container">
+    <h2>Light Level</h2>
+    <canvas id="lightChart"></canvas>
+    <div id="light-error" class="error"></div>
+  </div>
+
+  <script>
+    // Initialize Charts
+    const tempCtx = document.getElementById('tempChart').getContext('2d');
+    const humidityCtx = document.getElementById('humidityChart').getContext('2d');
+    const lightCtx = document.getElementById('lightChart').getContext('2d');
+
+    // Temperature Chart
+    const tempChart = new Chart(tempCtx, {
+      type: 'line',
+      data: {
+        labels: [], // Time labels
+        datasets: [{
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderWidth: 1,
+          tension: 0.4,
+        }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: 'Time' } },
+          y: { title: { display: true, text: 'Temperature (°C)' }, min: 0, max: 50 }
+        }
+      }
+    });
+
+    // Humidity Chart
+    const humidityChart = new Chart(humidityCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Humidity (%)',
+          data: [],
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderWidth: 1,
+          tension: 0.4,
+        }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: 'Time' } },
+          y: { title: { display: true, text: 'Humidity (%)' }, min: 0, max: 100 }
+        }
+      }
+    });
+
+    // Light Level Chart
+    const lightChart = new Chart(lightCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Light Level',
+          data: [],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          borderWidth: 1,
+          tension: 0.4,
+        }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: 'Time' } },
+          y: { title: { display: true, text: 'Light Level' }, min: 0, max: 1023 }
+        }
+      }
+    });
+
+    // Fetch and Update Chart Data
+    function fetchSensorData() {
+      fetch('/api/sensor-data')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Fetched data:', data);
+
+          const now = new Date().toLocaleTimeString();
+
+          // Update Temperature Chart
+          tempChart.data.labels.push(now);
+          tempChart.data.datasets[0].data.push(data.temperature || 0);
+          if (tempChart.data.labels.length > 10) tempChart.data.labels.shift();
+          if (tempChart.data.datasets[0].data.length > 10) tempChart.data.datasets[0].data.shift();
+          tempChart.update();
+
+          // Update Humidity Chart
+          humidityChart.data.labels.push(now);
+          humidityChart.data.datasets[0].data.push(data.humidity || 0);
+          if (humidityChart.data.labels.length > 10) humidityChart.data.labels.shift();
+          if (humidityChart.data.datasets[0].data.length > 10) humidityChart.data.datasets[0].data.shift();
+          humidityChart.update();
+
+          // Update Light Chart
+          lightChart.data.labels.push(now);
+          lightChart.data.datasets[0].data.push(data.lightValue || 0);
+          if (lightChart.data.labels.length > 10) lightChart.data.labels.shift();
+          if (lightChart.data.datasets[0].data.length > 10) lightChart.data.datasets[0].data.shift();
+          lightChart.update();
+
+          // Update Error Messages
+          document.getElementById('temp-error').innerText =
+            data.temperature < 20 || data.temperature > 28
+              ? 'Temperature is outside the normal range (20-28 °C)!'
+              : '';
+          document.getElementById('humidity-error').innerText =
+            data.humidity < 30 || data.humidity > 35
+              ? 'Humidity is outside the normal range (30-35%)!'
+              : '';
+          document.getElementById('light-error').innerText =
+            data.lightValue < 300
+              ? 'Light level is too low!'
+              : '';
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+          document.getElementById('temp-error').innerText = 'Error fetching data!';
+          document.getElementById('humidity-error').innerText = 'Error fetching data!';
+          document.getElementById('light-error').innerText = 'Error fetching data!';
+        });
+    }
+
+    // Fetch data every 5 seconds
+    setInterval(fetchSensorData, 5000);
+
+    // Initial fetch
+    fetchSensorData();
+  </script>
+</body>
+</html>
